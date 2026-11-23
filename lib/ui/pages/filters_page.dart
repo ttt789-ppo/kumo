@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../agh/agh_client.dart';
 import '../../agh/models.dart';
 import '../../main.dart';
-import '../theme.dart';
 import '../widgets.dart';
 
 class FiltersPage extends StatefulWidget {
