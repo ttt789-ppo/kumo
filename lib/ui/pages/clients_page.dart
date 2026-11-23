@@ -4,6 +4,7 @@ import '../../agh/agh_client.dart';
 import '../../agh/models.dart';
 import '../../main.dart';
 import '../widgets.dart';
+import 'client_detail_page.dart';
 
 class ClientsPage extends StatefulWidget {
   const ClientsPage({super.key});

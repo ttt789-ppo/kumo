@@ -4,6 +4,7 @@ import '../../agh/agh_client.dart';
 import '../../agh/models.dart';
 import '../../main.dart';
 import '../widgets.dart';
+import 'client_detail_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -317,6 +318,7 @@ class _HomePageState extends State<HomePage> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
+          final found = result;
           return AlertDialog(
             title: const Text('误杀排查'),
             content: SizedBox(
@@ -336,19 +338,19 @@ class _HomePageState extends State<HomePage> {
                   if (busy) const LinearProgressIndicator(),
                   if (error != null)
                     Text(error, style: TextStyle(color: scheme.error, fontSize: 13)),
-                  if (result != null) ...[
+                  if (found != null) ...[
                     Text(
-                      result.blocked ? '已被拦截' : '未被拦截',
+                      found.blocked ? '已被拦截' : '未被拦截',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
-                        color: result.blocked ? scheme.error : scheme.primary,
+                        color: found.blocked ? scheme.error : scheme.primary,
                       ),
                     ),
                     const SizedBox(height: 6),
-                    Text('${result.reason} · ${result.serviceName}',
+                    Text('${found.reason} · ${found.serviceName}',
                         style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant)),
                     const SizedBox(height: 10),
-                    for (final r in result.rules)
+                    for (final r in found.rules)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 3),
                         child: Text(r.text,
@@ -386,7 +388,7 @@ class _HomePageState extends State<HomePage> {
                 },
                 child: const Text('排查'),
               ),
-              if (result != null && result!.blocked)
+              if (found != null && found.blocked)
                 TextButton(
                   onPressed: () async {
                     await appState.api.allowDomain(ctrl.text.trim());
