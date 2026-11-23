@@ -1,0 +1,25 @@
+# Flutter/Dart
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec.lock
+
+# Android
+local.properties
+key.properties
+*.jks
+*.keystore
+android/.gradle/
+android/app/debug
+android/app/profile
+android/app/release
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# 系统
+.DS_Store

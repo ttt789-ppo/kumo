@@ -1,0 +1,64 @@
+name: Build Kumo APK
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Versions
+        run: |
+          flutter --version
+          java -version
+
+      - name: Dependencies
+        run: flutter pub get
+
+      - name: Ensure gradle wrapper files
+        run: |
+          if [ ! -f android/gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "补全 gradle wrapper"
+            flutter create --platforms=android --project-name kumo --org com.kumo /tmp/tpl
+            cp /tmp/tpl/android/gradlew android/gradlew
+            chmod +x android/gradlew
+            cp /tmp/tpl/android/gradle/wrapper/gradle-wrapper.jar android/gradle/wrapper/
+            cp /tmp/tpl/android/gradle/wrapper/gradle-wrapper.properties android/gradle/wrapper/
+          fi
+
+      - name: Analyze (non-blocking)
+        run: flutter analyze || true
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Collect artifact
+        run: |
+          mkdir -p out
+          cp build/app/outputs/flutter-apk/app-release.apk out/kumo-${GITHUB_RUN_NUMBER}.apk
+          ls -lh out
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: kumo-apk
+          path: out/*.apk
+          if-no-files-found: error
