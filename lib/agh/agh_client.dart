@@ -117,6 +117,9 @@ class AghClient {
     return (j as Map).cast<String, dynamic>();
   }
 
+  Future<void> setDnsConfig(Map<String, dynamic> config) =>
+      post('/control/dns_config', config);
+
   Future<List<String>> upstreams() async {
     final j = await dnsInfo();
     return ((j['upstream_dns'] as List?) ?? const []).map((e) => '$e').toList();

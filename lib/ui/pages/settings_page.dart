@@ -4,6 +4,7 @@ import '../../agh/agh_client.dart';
 import '../../agh/models.dart';
 import '../../main.dart';
 import '../widgets.dart';
+import 'dns_config_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -36,6 +37,13 @@ class _SettingsPageState extends State<SettingsPage> {
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Future<void> _openDns() async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const DnsConfigPage()),
+    );
+    await _load();
   }
 
   Future<void> _addRewrite() async {
@@ -102,17 +110,20 @@ class _SettingsPageState extends State<SettingsPage> {
               icon: Icons.cloud_queue,
               title: '上游 DNS',
               value: ups.isEmpty ? '—' : ups.join('\n'),
+              onTap: _openDns,
             ),
             const SizedBox(height: 10),
             InfoTile(
               icon: Icons.hub_outlined,
               title: 'Bootstrap',
               value: bootstrap.isEmpty ? '—' : bootstrap.join('、'),
+              onTap: _openDns,
             ),
             const SizedBox(height: 10),
             InfoTile(
               icon: Icons.cached,
               title: '缓存',
+              onTap: _openDns,
               value: _dns['cache_enabled'] == true
                   ? '已开启 · 最小 TTL ${_dns['cache_ttl_min'] ?? 0}s'
                   : '已关闭',
@@ -122,6 +133,7 @@ class _SettingsPageState extends State<SettingsPage> {
               icon: Icons.abc,
               title: 'AAAA 查询',
               value: _dns['aaaa_disabled'] == true ? '已停用（省流量）' : '正常返回',
+              onTap: _openDns,
             ),
             const SectionLabel(
               'DNS 重写',

@@ -337,7 +337,7 @@ class _HomePageState extends State<HomePage> {
                   const SizedBox(height: 16),
                   if (busy) const LinearProgressIndicator(),
                   if (error != null)
-                    Text(error, style: TextStyle(color: scheme.error, fontSize: 13)),
+                    Text(error!, style: TextStyle(color: scheme.error, fontSize: 13)),
                   if (found != null) ...[
                     Text(
                       found.blocked ? '已被拦截' : '未被拦截',

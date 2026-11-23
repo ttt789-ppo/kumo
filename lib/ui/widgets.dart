@@ -168,6 +168,7 @@ class InfoTile extends StatelessWidget {
   final String title;
   final String value;
   final Widget? trailing;
+  final VoidCallback? onTap;
 
   const InfoTile({
     super.key,
@@ -175,12 +176,14 @@ class InfoTile extends StatelessWidget {
     required this.title,
     required this.value,
     this.trailing,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return KsuCard(
+      onTap: onTap,
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       child: Row(
         children: [
