@@ -111,6 +111,9 @@ class _ClientTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return KsuCard(
+      onTap: () => Navigator.of(context).push<bool>(
+        MaterialPageRoute(builder: (_) => ClientDetailPage(clientName: client.name)),
+      ),
       child: Row(
         children: [
           Icon(Icons.smartphone, color: scheme.onSurfaceVariant),

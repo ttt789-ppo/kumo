@@ -179,6 +179,7 @@ class KeyValue {
 
 /// 过滤器订阅
 class FilterEntry {
+  final int id;
   final String url;
   final String name;
   final int rulesCount;
@@ -187,6 +188,7 @@ class FilterEntry {
   final String lastUpdated;
 
   FilterEntry({
+    this.id = 0,
     required this.url,
     required this.name,
     required this.rulesCount,
@@ -196,6 +198,7 @@ class FilterEntry {
   });
 
   factory FilterEntry.fromJson(Map<String, dynamic> j, {bool whitelist = false}) => FilterEntry(
+        id: int.tryParse('${j['id'] ?? 0}') ?? 0,
         url: (j['url'] ?? '').toString(),
         name: (j['name'] ?? '').toString(),
         rulesCount: int.tryParse('${j['rules_count'] ?? 0}') ?? 0,
@@ -205,70 +208,177 @@ class FilterEntry {
       );
 }
 
-/// 查询日志条目
+/// 日志里命中的具体规则
+class LogRule {
+  final String text;
+  final int filterId;
+  LogRule(this.text, this.filterId);
+
+  factory LogRule.fromJson(Map<String, dynamic> j) => LogRule(
+        (j['text'] ?? '').toString(),
+        int.tryParse('${j['filter_list_id'] ?? 0}') ?? 0,
+      );
+}
+
+/// 查询日志条目（对应 /control/querylog）
 class QueryLogEntry {
-  final String question;
-  final String answer;
+  final String domain;
+  final String qtype;
   final String client;
+  final String clientIp;
+  final String reason;
   final String status;
   final String time;
   final String upstream;
   final double elapsedMs;
-  final List<String> rules;
+  final bool cached;
+  final String answer;
+  final List<LogRule> rules;
 
   QueryLogEntry({
-    required this.question,
-    required this.answer,
+    required this.domain,
+    required this.qtype,
     required this.client,
+    required this.clientIp,
+    required this.reason,
     required this.status,
     required this.time,
     required this.upstream,
     required this.elapsedMs,
+    required this.cached,
+    required this.answer,
     required this.rules,
   });
 
-  bool get blocked => status.toUpperCase().contains('BLOCK') ||
-      status.toUpperCase().contains('FILTERED') ||
-      status.toUpperCase().contains('SAFE');
+  /// 拦截类 reason
+  static const _blockedReasons = {
+    'FilteredBlackList',
+    'FilteredSafeBrowsing',
+    'FilteredParental',
+    'FilteredBlockedService',
+  };
+
+  bool get blocked => _blockedReasons.contains(reason);
+
+  /// 白名单放行
+  bool get whitelisted => reason == 'FilteredWhiteList' || reason == 'NotFilteredWhiteList';
+
+  String get reasonLabel {
+    switch (reason) {
+      case 'FilteredBlackList':
+        return '黑名单';
+      case 'FilteredWhiteList':
+      case 'NotFilteredWhiteList':
+        return '白名单';
+      case 'FilteredSafeBrowsing':
+        return '安全浏览';
+      case 'FilteredParental':
+        return '家长控制';
+      case 'FilteredBlockedService':
+        return '服务屏蔽';
+      case 'NotFilteredNotFound':
+        return '无拦截';
+      case 'NotFilteredError':
+        return '解析失败';
+      case 'Rewritten':
+        return '重写';
+      default:
+        return reason.isEmpty ? '—' : reason;
+    }
+  }
+
+  String get stateLabel {
+    if (blocked) return '已拦截';
+    if (whitelisted) return '已放行';
+    return '已处理';
+  }
 
   factory QueryLogEntry.fromJson(Map<String, dynamic> j) {
+    String domain = '';
+    String qtype = '';
     final q = j['question'];
-    String question = '';
-    if (q is Map) question = (q['name'] ?? '').toString();
-    final ans = j['answer'];
+    if (q is Map) {
+      domain = (q['name'] ?? '').toString();
+      qtype = (q['type'] ?? '').toString();
+    }
+    String client = '';
+    String clientIp = (j['client'] ?? '').toString();
+    final ci = j['client_info'];
+    if (ci is Map) {
+      client = (ci['name'] ?? '').toString();
+      if (client.isEmpty) client = (ci['whois'] is Map ? '' : '');
+    }
+    if (client.isEmpty) client = clientIp.isEmpty ? '—' : clientIp;
+
     String answer = '';
-    if (ans is Map) {
-      final v = ans['value'];
-      if (v is String) {
-        answer = v;
-      } else if (v is List) {
-        answer = v.map((e) => e is Map ? (e['value'] ?? '').toString() : '$e').join(', ');
-      }
+    final a = j['answer'];
+    if (a is List) {
+      answer = a
+          .whereType<Map>()
+          .map((e) => (e['value'] ?? '').toString())
+          .where((e) => e.isNotEmpty)
+          .join(', ');
     }
-    final client = j['client'];
-    String clientStr = '';
-    if (client is Map) {
-      clientStr = (client['name'] ?? client['IP'] ?? client['ip'] ?? '').toString();
-      if (clientStr.isEmpty) clientStr = (client['ids'] ?? '').toString();
-    } else if (client is String) {
-      clientStr = client;
-    }
-    final rules = <String>[];
+
+    final rules = <LogRule>[];
     final r = j['rules'];
     if (r is List) {
       for (final e in r) {
-        if (e is Map && e['text'] != null) rules.add('${e['text']}');
+        if (e is Map) rules.add(LogRule.fromJson(e.cast<String, dynamic>()));
       }
     }
+
     return QueryLogEntry(
-      question: question,
-      answer: answer,
-      client: clientStr.isEmpty ? '—' : clientStr,
+      domain: domain,
+      qtype: qtype,
+      client: client,
+      clientIp: clientIp,
+      reason: (j['reason'] ?? '').toString(),
       status: (j['status'] ?? '').toString(),
       time: (j['time'] ?? '').toString(),
       upstream: (j['upstream'] ?? '').toString(),
-      elapsedMs: (double.tryParse('${j['elapsedMs'] ?? 0}') ?? 0),
+      elapsedMs: double.tryParse('${j['elapsedMs'] ?? 0}') ?? 0,
+      cached: j['cached'] == true,
+      answer: answer,
       rules: rules,
+    );
+  }
+}
+
+/// /control/filtering/check_host 的结果
+class CheckHostResult {
+  final String reason;
+  final List<LogRule> rules;
+  final String serviceName;
+  final String cname;
+  final List<String> ipAddrs;
+
+  CheckHostResult({
+    required this.reason,
+    required this.rules,
+    required this.serviceName,
+    required this.cname,
+    required this.ipAddrs,
+  });
+
+  bool get blocked => const {
+        'FilteredBlackList',
+        'FilteredSafeBrowsing',
+        'FilteredParental',
+        'FilteredBlockedService',
+      }.contains(reason);
+
+  factory CheckHostResult.fromJson(Map<String, dynamic> j) {
+    final rules = <LogRule>[];
+    for (final e in (j['rules'] as List?) ?? const []) {
+      if (e is Map) rules.add(LogRule.fromJson(e.cast<String, dynamic>()));
+    }
+    return CheckHostResult(
+      reason: (j['reason'] ?? '').toString(),
+      rules: rules,
+      serviceName: (j['service_name'] ?? '').toString(),
+      cname: (j['cname'] ?? '').toString(),
+      ipAddrs: ((j['ip_addrs'] as List?) ?? const []).map((e) => '$e').toList(),
     );
   }
 }

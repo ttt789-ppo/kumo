@@ -213,9 +213,196 @@ class _HomePageState extends State<HomePage> {
                 setter: (v) async => throw AghException('家长控制请到 Web 面板修改'),
                 readOnly: true,
               ),
+              const SectionLabel('工具'),
+              KsuCard(
+                onTap: _checkHostDialog,
+                child: Row(
+                  children: [
+                    Icon(Icons.manage_search, color: scheme.primary),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('误杀排查', style: TextStyle(fontWeight: FontWeight.w700)),
+                          SizedBox(height: 3),
+                          Text('查一个域名被哪条规则拦了，可一键放行',
+                              style: TextStyle(fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              KsuCard(
+                onTap: _openClientPicker,
+                child: Row(
+                  children: [
+                    Icon(Icons.devices_other_outlined, color: scheme.primary),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('分应用放行', style: TextStyle(fontWeight: FontWeight.w700)),
+                          SizedBox(height: 3),
+                          Text('按设备关掉过滤，ADH 只认 IP 不认包名',
+                              style: TextStyle(fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right),
+                  ],
+                ),
+              ),
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _openClientPicker() async {
+    try {
+      final list = await appState.api.clients();
+      if (!mounted) return;
+      if (list.isEmpty) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('还没有客户端记录')));
+        return;
+      }
+      final name = await showModalBottomSheet<String>(
+        context: context,
+        showDragHandle: true,
+        builder: (ctx) => SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+                child: Text('选择要放行的设备',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+              ),
+              for (final c in list)
+                ListTile(
+                  leading: const Icon(Icons.smartphone),
+                  title: Text(c.name),
+                  subtitle: Text(c.ids, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  onTap: () => Navigator.pop(ctx, c.name),
+                ),
+            ],
+          ),
+        ),
+      );
+      if (name == null || !mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => ClientDetailPage(clientName: name)),
+      );
+      await _load();
+    } on AghException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
+
+  Future<void> _checkHostDialog() async {
+    final ctrl = TextEditingController();
+    final scheme = Theme.of(context).colorScheme;
+    CheckHostResult? result;
+    String? error;
+    bool busy = false;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return AlertDialog(
+            title: const Text('误杀排查'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: ctrl,
+                    decoration: const InputDecoration(
+                      hintText: 'log.avlyun.com',
+                      labelText: '域名',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (busy) const LinearProgressIndicator(),
+                  if (error != null)
+                    Text(error, style: TextStyle(color: scheme.error, fontSize: 13)),
+                  if (result != null) ...[
+                    Text(
+                      result.blocked ? '已被拦截' : '未被拦截',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: result.blocked ? scheme.error : scheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text('${result.reason} · ${result.serviceName}',
+                        style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant)),
+                    const SizedBox(height: 10),
+                    for (final r in result.rules)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 3),
+                        child: Text(r.text,
+                            style: TextStyle(
+                                fontSize: 12.5,
+                                fontFamily: 'monospace',
+                                color: scheme.onSurfaceVariant)),
+                      ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('关闭')),
+              FilledButton(
+                onPressed: () async {
+                  final name = ctrl.text.trim();
+                  if (name.isEmpty) return;
+                  setDialogState(() {
+                    busy = true;
+                    error = null;
+                  });
+                  try {
+                    final r = await appState.api.checkHost(name);
+                    setDialogState(() {
+                      result = r;
+                      busy = false;
+                    });
+                  } on AghException catch (e) {
+                    setDialogState(() {
+                      error = e.message;
+                      busy = false;
+                    });
+                  }
+                },
+                child: const Text('排查'),
+              ),
+              if (result != null && result!.blocked)
+                TextButton(
+                  onPressed: () async {
+                    await appState.api.allowDomain(ctrl.text.trim());
+                    if (!ctx.mounted) return;
+                    Navigator.pop(ctx);
+                    await _load();
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('已放行 ${ctrl.text.trim()}')),
+                    );
+                  },
+                  child: const Text('放行'),
+                ),
+            ],
+          );
+        },
       ),
     );
   }

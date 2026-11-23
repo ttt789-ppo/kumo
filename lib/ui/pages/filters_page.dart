@@ -4,6 +4,7 @@ import '../../agh/agh_client.dart';
 import '../../agh/models.dart';
 import '../../main.dart';
 import '../widgets.dart';
+import 'filter_detail_page.dart';
 
 class FiltersPage extends StatefulWidget {
   const FiltersPage({super.key});
@@ -209,6 +210,12 @@ class _FiltersPageState extends State<FiltersPage> {
             for (final f in _filters) ...[
               KsuCard(
                 padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
+                onTap: () async {
+                  final changed = await Navigator.of(context).push<bool>(
+                    MaterialPageRoute(builder: (_) => FilterDetailPage(entry: f)),
+                  );
+                  if (changed == true || changed == null) await _load();
+                },
                 child: Row(
                   children: [
                     Expanded(

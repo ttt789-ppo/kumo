@@ -190,6 +190,52 @@ class AghClient {
 
   Future<void> clearQueryLog() => post('/control/querylog_clear');
 
+  /// 误杀排查：查一个域名会被哪条规则命中
+  Future<CheckHostResult> checkHost(String name) async {
+    final j = await get('/control/filtering/check_host', {'name': name});
+    if (j is! Map) throw AghException('排查接口返回异常');
+    return CheckHostResult.fromJson(j.cast<String, dynamic>());
+  }
+
+  /// 修改订阅的名称 / 地址
+  Future<void> updateFilter(FilterEntry old, {required String name, required String url}) =>
+      post('/control/filtering/set_url', {
+        'url': old.url,
+        'whitelist': old.whitelist,
+        'data': {'name': name, 'url': url, 'enabled': old.enabled},
+      });
+
+  /// 把域名加入放行（自定义规则里追加 @@||domain^）
+  Future<void> allowDomain(String domain) async {
+    final st = await filteringStatus();
+    final rule = '@@||${domain.replaceAll(RegExp(r'^\|\|'), '').replaceAll('^', '')}^';
+    if (st.userRules.contains(rule)) return;
+    final rules = [...st.userRules, rule];
+    await setUserRules(rules);
+  }
+
+  /// 把域名加入拦截
+  Future<void> blockDomain(String domain) async {
+    final st = await filteringStatus();
+    final rule = '||${domain.replaceAll(RegExp(r'^\|\|'), '').replaceAll('^', '')}^';
+    if (st.userRules.contains(rule)) return;
+    final rules = [...st.userRules, rule];
+    await setUserRules(rules);
+  }
+
+  /// 客户端完整配置（分应用放行用）
+  Future<Map<String, dynamic>> clientRaw(String name) async {
+    final j = (await get('/control/clients') as Map).cast<String, dynamic>();
+    for (final e in (j['clients'] as List?) ?? const []) {
+      if (e is Map && '${e['name']}' == name) return e.cast<String, dynamic>();
+    }
+    throw AghException('找不到客户端 $name');
+  }
+
+  /// 保存客户端设置（filtering_enabled=false 即该客户端不过滤）
+  Future<void> updateClient(String name, Map<String, dynamic> data) =>
+      post('/control/clients/update', {'name': name, 'data': data});
+
   // ---------- 客户端 ----------
 
   Future<List<ClientEntry>> clients() async {
